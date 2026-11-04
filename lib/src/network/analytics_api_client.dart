@@ -61,7 +61,8 @@ class AnalyticsApiClient {
     final body = jsonEncode(buildPayload(deviceId: deviceId, deviceInfo: deviceInfo, events: events, userId: userId, userProperties: userProperties,),);
 
     try {
-      final response = await _client.post(endpoint, headers: <String, String>{'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'X-Api-Key': ?apiKey,}, body: body,).timeout(timeout);
+      //final response = await _client.post(endpoint, headers: <String, String>{'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'X-Api-Key': ?apiKey,}, body: body,).timeout(timeout);
+      final response = await _client.post(endpoint, headers: <String, String>{'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', if (apiKey != null && apiKey!.isNotEmpty) 'Authorization': 'Bearer $apiKey',}, body: body,).timeout(timeout);
 
       return _classify(response);
     } catch (error, stackTrace) {

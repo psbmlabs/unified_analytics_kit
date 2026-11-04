@@ -22,7 +22,7 @@ void main() {
 
     expect(result.status, UploadStatus.success);
     expect(captured.method, 'POST');
-    expect(captured.headers['X-Api-Key'], 'key-123');
+    expect(captured.headers['Authorization'], 'Bearer key-123');
     expect(captured.headers['Content-Type'], contains('application/json'));
 
     final body = jsonDecode(captured.body) as Map<String, dynamic>;
@@ -37,7 +37,7 @@ void main() {
     late http.Request captured;
     final client = build(MockClient((request) async {captured = request;return http.Response('', 200);}), apiKey: null,);
     await send(client);
-    expect(captured.headers.containsKey('X-Api-Key'), isFalse);
+    expect(captured.headers.containsKey('Authorization'), isFalse);
   });
 
   test('5xx means retry', () async {
