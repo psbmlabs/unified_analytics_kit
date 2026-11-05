@@ -38,6 +38,8 @@ class AnalyticsManager with WidgetsBindingObserver {
   Future<void>? _initFuture;
   bool _ready = false;
   bool _decided = false;
+  DateTime? _decidedAt;
+  int _declineCount = 0;
   AnalyticsConsent _consent = const AnalyticsConsent.none();
   Set<AnalyticsDestination> _defaultDestinations = AnalyticsDestination.all;
 
@@ -51,6 +53,12 @@ class AnalyticsManager with WidgetsBindingObserver {
   AnalyticsConsent get consent => _consent;
 
   bool get hasConsentDecision => _decided;
+
+  // >>> When the user last made a choice (UTC). `null` when there is no decision or it is old data.
+  DateTime? get consentDecidedAt => _decidedAt;
+
+  // >>> The decline count the app saved with the last choice (0 when unknown).
+  int get consentDeclineCount => _declineCount;
 
   // >>> Providers that could not start (for example Firebase not initialized).
   List<String> get failedProviderIds => List<String>.unmodifiable(_failedProviderIds);
@@ -78,6 +86,8 @@ class AnalyticsManager with WidgetsBindingObserver {
 
     final saved = _consentStore?.load();
     _decided = saved != null;
+    _decidedAt = _consentStore?.loadDecidedAt();
+    _declineCount = _consentStore?.loadDeclines() ?? 0;
     _consent = saved ?? config.defaultConsent;
 
     final candidates = _injectedProviders ?? _buildProviders(config);
@@ -133,7 +143,7 @@ class AnalyticsManager with WidgetsBindingObserver {
     return _ready;
   }
 
-  Future<void> setConsent(AnalyticsConsent consent) async {
+  Future<void> setConsent(AnalyticsConsent consent, {int declineCount = 0}) async {
     final init = _initFuture;
     if (init == null) {
       throw StateError('Call AnalyticsManager.initialize() first.');
@@ -143,10 +153,12 @@ class AnalyticsManager with WidgetsBindingObserver {
     final previous = _consent;
     _consent = consent;
     _decided = true;
+    _decidedAt = DateTime.now().toUtc();
+    _declineCount = declineCount;
     _syncDeviceInfoMode();
 
     try {
-      await _consentStore?.save(consent);
+      await _consentStore?.save(consent, declineCount: declineCount);
     } catch (error, stackTrace) {
       AnalyticsLogger.error('Could not save consent', error, stackTrace);
     }

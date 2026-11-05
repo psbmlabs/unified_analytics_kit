@@ -21,6 +21,8 @@ class ConsentStore {
 
   static const String defaultBoxName = 'unified_analytics_kit_consent';
   static const String _key = 'consent';
+  static const String _decidedAtKey = 'decided_at';
+  static const String _declinesKey = 'declines';
   final Box<String> _box;
 
   /// >>> Returns the saved consent, or `null` when the user never made a choice
@@ -41,12 +43,30 @@ class ConsentStore {
   /// >>> Whether the user already made a choice.
   bool get hasDecision => load() != null;
 
-  Future<void> save(AnalyticsConsent consent) {
-    return _box.put(_key, jsonEncode(consent.toJson()));
+  /// >>> When the choice was last saved (UTC), or `null` for old data / no decision.
+  DateTime? loadDecidedAt() {
+    final raw = _box.get(_decidedAtKey);
+    if (raw == null) return null;
+    return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  /// >>> How many times the user declined (0 when unknown). The app decides what "declined" means.
+  int loadDeclines() => int.tryParse(_box.get(_declinesKey) ?? '') ?? 0;
+
+  /// >>> Saves the choice together with the time. [declineCount] lets the app remember how often
+  /// >>> the user said no, for example to ask again later, but not forever.
+  Future<void> save(AnalyticsConsent consent, {int declineCount = 0}) async {
+    await _box.put(_key, jsonEncode(consent.toJson()));
+    await _box.put(_decidedAtKey, DateTime.now().toUtc().toIso8601String());
+    await _box.put(_declinesKey, declineCount.toString());
   }
 
   /// >>> Forgets the saved choice, so the user is asked again.
-  Future<void> clear() => _box.delete(_key);
+  Future<void> clear() async {
+    await _box.delete(_key);
+    await _box.delete(_decidedAtKey);
+    await _box.delete(_declinesKey);
+  }
 
   Future<void> close() => _box.close();
 }

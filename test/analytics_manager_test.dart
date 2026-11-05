@@ -131,6 +131,22 @@ void main() {
     expect(manager.consent, const AnalyticsConsent(facebook: true));
   });
 
+  test('the decision time and decline count are remembered by the next manager', () async {
+    await manager.initialize(AnalyticsConfig());
+    expect(manager.consentDecidedAt, isNull);
+    expect(manager.consentDeclineCount, 0);
+
+    await manager.setConsent(const AnalyticsConsent.none(), declineCount: 2);
+    expect(manager.consentDeclineCount, 2);
+    expect(manager.consentDecidedAt, isNotNull);
+    await manager.dispose();
+
+    manager = build([firebase, facebook]);
+    await manager.initialize(AnalyticsConfig());
+    expect(manager.consentDeclineCount, 2);
+    expect(manager.consentDecidedAt, isNotNull);
+  });
+
   test('user id is held back until consent is granted', () async {
     await manager.initialize(AnalyticsConfig());
     await manager.setUserId('user_1');
@@ -217,12 +233,12 @@ void main() {
     });
 
     test('screen scope applies its destinations and adds screen_name', () async {
-          final screen = manager.forScreen('Checkout', destinations: {AnalyticsDestination.facebook},);
-          await screen.logEvent('pay_tapped');
+      final screen = manager.forScreen('Checkout', destinations: {AnalyticsDestination.facebook},);
+      await screen.logEvent('pay_tapped');
 
-          expect(facebook.events.single.parameters['screen_name'], 'Checkout');
-          expect(firebase.events, isEmpty);
-          expect(database.events, isEmpty);
+      expect(facebook.events.single.parameters['screen_name'], 'Checkout');
+      expect(firebase.events, isEmpty);
+      expect(database.events, isEmpty);
     });
 
     test('a call overrides the screen scope', () async {

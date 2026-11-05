@@ -1,6 +1,6 @@
 name: unified_analytics_kit
 description: "Unified Flutter analytics toolkit that sends events to Firebase, Facebook and your own backend with one API, a persistent device ID and an offline queue."
-version: 1.0.3
+version: 1.0.4
 repository: https://github.com/psbmlabs/unified_analytics_kit
 issue_tracker: https://github.com/psbmlabs/unified_analytics_kit/issues
 publish_to: none

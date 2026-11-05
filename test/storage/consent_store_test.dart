@@ -51,6 +51,21 @@ void main() {
     expect(store.hasDecision, isFalse);
   });
 
+  test('remembers when and how often the user declined', () async {
+    expect(store.loadDecidedAt(), isNull);
+    expect(store.loadDeclines(), 0);
+
+    await store.save(const AnalyticsConsent.none(), declineCount: 2);
+    expect(store.loadDeclines(), 2);
+    final at = store.loadDecidedAt();
+    expect(at, isNotNull);
+    expect(DateTime.now().toUtc().difference(at!).inSeconds, lessThan(5));
+
+    await store.clear();
+    expect(store.loadDecidedAt(), isNull);
+    expect(store.loadDeclines(), 0);
+  });
+
   test('clear forgets the choice', () async {
     await store.save(const AnalyticsConsent.all());
     await store.clear();
