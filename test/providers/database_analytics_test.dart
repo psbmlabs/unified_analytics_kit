@@ -88,12 +88,12 @@ void main() {
 
   void stubUpload(UploadResult result) {
     when(() => client.sendBatch(
-        deviceId: any(named: 'deviceId'),
-        deviceInfo: any(named: 'deviceInfo'),
-        events: any(named: 'events'),
-        userId: any(named: 'userId'),
-        userProperties: any(named: 'userProperties'),
-      ),
+      deviceId: any(named: 'deviceId'),
+      deviceInfo: any(named: 'deviceInfo'),
+      events: any(named: 'events'),
+      userId: any(named: 'userId'),
+      userProperties: any(named: 'userProperties'),
+    ),
     ).thenAnswer((_) async => result);
   }
 
@@ -133,12 +133,12 @@ void main() {
     await provider.flush();
 
     verify(() => client.sendBatch(
-        deviceId: any(named: 'deviceId'),
-        deviceInfo: any(named: 'deviceInfo'),
-        events: any(named: 'events'),
-        userId: any(named: 'userId'),
-        userProperties: any(named: 'userProperties'),
-      ),
+      deviceId: any(named: 'deviceId'),
+      deviceInfo: any(named: 'deviceInfo'),
+      events: any(named: 'events'),
+      userId: any(named: 'userId'),
+      userProperties: any(named: 'userProperties'),
+    ),
     ).called(1);
   });
 
@@ -174,13 +174,39 @@ void main() {
     await provider.flush();
 
     verify(() => client.sendBatch(
-        deviceId: 'device-1',
-        deviceInfo: any(named: 'deviceInfo'),
-        events: any(named: 'events'),
-        userId: 'user_1',
-        userProperties: {'plan': 'pro'},
-      ),
+      deviceId: 'device-1',
+      deviceInfo: any(named: 'deviceInfo'),
+      events: any(named: 'events'),
+      userId: 'user_1',
+      userProperties: {'plan': 'pro'},
+    ),
     ).called(greaterThanOrEqualTo(1));
+  });
+
+  test('anonymous mode: no device id, no device info, no properties, but the user id is kept', () async {
+    stubUpload(const UploadResult(UploadStatus.success, statusCode: 200));
+    provider.shareDeviceInfo = false;
+    await provider.initialize();
+    await provider.setUserId('user_1');
+    await provider.setUserProperty(name: 'plan', value: 'pro');
+    await provider.logEvent(event('a'));
+    await provider.flush();
+
+    // >>> One verify only: mocktail marks a verified call, so the same call cannot be verified twice.
+    // >>> The literals check: fixed anonymous id, user id kept, no user properties.
+    // >>> captureAny gives us the device info to check that only the platform is set.
+    final info = verify(() => client.sendBatch(
+      deviceId: 'anonymous-android',
+      deviceInfo: captureAny(named: 'deviceInfo'),
+      events: any(named: 'events'),
+      userId: 'user_1',
+      userProperties: <String, String>{},
+    ),
+    ).captured.last as AnalyticsDeviceInfo;
+
+    expect(info.platform, 'android');
+    expect(info.model, isNull);
+    expect(info.osVersion, isNull);
   });
 
   test('logEvent before initialize is ignored safely', () async {

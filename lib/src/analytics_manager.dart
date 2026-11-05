@@ -86,11 +86,18 @@ class AnalyticsManager with WidgetsBindingObserver {
     _ready = true;
   }
 
+  // >>> Applies [AnalyticsConsent.deviceInfo] to the database provider (anonymous mode on/off).
+  void _syncDeviceInfoMode() {
+    for (final database in _active.whereType<DatabaseAnalytics>()) {
+      database.shareDeviceInfo = _consent.deviceInfo;
+    }
+  }
+
   List<AnalyticsProvider> _buildProviders(AnalyticsConfig config) {
     return <AnalyticsProvider>[
       if (config.enableFirebase) FirebaseAnalyticsProvider(),
       if (config.enableFacebook) FacebookAnalytics(),
-      if (config.enableDatabase) DatabaseAnalytics(config: config, deviceIdService: _deviceIdService),
+      if (config.enableDatabase) DatabaseAnalytics(config: config, deviceIdService: _deviceIdService, shareDeviceInfo: _consent.deviceInfo),
     ];
   }
 
@@ -136,6 +143,7 @@ class AnalyticsManager with WidgetsBindingObserver {
     final previous = _consent;
     _consent = consent;
     _decided = true;
+    _syncDeviceInfoMode();
 
     try {
       await _consentStore?.save(consent);

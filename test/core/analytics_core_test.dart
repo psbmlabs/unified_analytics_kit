@@ -50,6 +50,13 @@ void main() {
       expect(AnalyticsConsent.fromJson(consent.toJson()), consent);
       expect(consent.isGrantedFor(AnalyticsProviderIds.database), isTrue);
     });
+
+    test('deviceInfo: old saved data means granted, none means off, and it round trips', () {
+      expect(AnalyticsConsent.fromJson(const {'firebase': true, 'database': true}).deviceInfo, isTrue);
+      expect(const AnalyticsConsent.none().deviceInfo, isFalse);
+      const anonymous = AnalyticsConsent(database: true, deviceInfo: false);
+      expect(AnalyticsConsent.fromJson(anonymous.toJson()), anonymous);
+    });
   });
 
   group('AnalyticsConfig', () {

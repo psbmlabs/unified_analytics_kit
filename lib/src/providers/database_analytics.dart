@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import '../core/analytics_config.dart';
 import '../core/analytics_event.dart';
 import '../core/analytics_logger.dart';
@@ -13,7 +14,7 @@ import '../storage/event_queue.dart';
 /// >>> Stores events in an offline queue and uploads them in batches to the
 
 class DatabaseAnalytics implements AnalyticsProvider {
-  DatabaseAnalytics({required this._config, DeviceIdService? deviceIdService, DeviceInfoCollector? deviceInfoCollector, AnalyticsApiClient? apiClient, EventQueue? queue, Connectivity? connectivity,})  : _deviceIdService = deviceIdService ?? DeviceIdService(), _deviceInfoCollector = deviceInfoCollector ?? DeviceInfoCollector(), _injectedClient = apiClient, _injectedQueue = queue, _connectivity = connectivity ?? Connectivity();
+  DatabaseAnalytics({required this._config, DeviceIdService? deviceIdService, DeviceInfoCollector? deviceInfoCollector, AnalyticsApiClient? apiClient, EventQueue? queue, Connectivity? connectivity, this.shareDeviceInfo = true,})  : _deviceIdService = deviceIdService ?? DeviceIdService(), _deviceInfoCollector = deviceInfoCollector ?? DeviceInfoCollector(), _injectedClient = apiClient, _injectedQueue = queue, _connectivity = connectivity ?? Connectivity();
 
   static const Duration _baseBackoff = Duration(seconds: 5);
   static const Duration _maxBackoff = Duration(minutes: 5);
@@ -36,6 +37,14 @@ class DatabaseAnalytics implements AnalyticsProvider {
   bool _flushing = false;
   bool _disposed = false;
 
+  // >>> true  = batches carry the real device id, device info and user properties.
+  // >>> false = anonymous mode: fixed `anonymous-<platform>` id, only the platform, no user properties.
+  // >>>         The user id (if the app set one) is still sent.
+  bool shareDeviceInfo;
+
+  static String get _platformName => defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+  String get _anonymousId => 'anonymous-$_platformName';
+
   int _failures = 0;
   DateTime? _nextAttemptAt;
 
@@ -57,13 +66,13 @@ class DatabaseAnalytics implements AnalyticsProvider {
     _initialized = true;
     _timer = Timer.periodic(_config.flushInterval, (_) => unawaited(flush()));
     _connectivitySub = _connectivity.onConnectivityChanged.listen((results) {
-        final online = results.any((r) => r != ConnectivityResult.none);
-        if (online) {
-          // >>> Connection is back, so a previous backoff no longer applies.
-          _nextAttemptAt = null;
-          unawaited(flush());
-        }
-      },
+      final online = results.any((r) => r != ConnectivityResult.none);
+      if (online) {
+        // >>> Connection is back, so a previous backoff no longer applies.
+        _nextAttemptAt = null;
+        unawaited(flush());
+      }
+    },
       onError: (Object error, StackTrace stackTrace) {AnalyticsLogger.error('Connectivity stream error', error, stackTrace);},
     );
     // >>> Upload anything left over from the previous app run.
@@ -136,12 +145,14 @@ class DatabaseAnalytics implements AnalyticsProvider {
         final batch = await _queue.peek(_config.batchSize);
         if (batch.isEmpty) break;
 
+        // >>> Read once per batch, so one request never mixes both modes.
+        final share = shareDeviceInfo;
         final result = await _client.sendBatch(
-          deviceId: await _deviceIdService.getDeviceId(),
-          deviceInfo: await _deviceInfoCollector.collect(),
+          deviceId: share ? await _deviceIdService.getDeviceId() : _anonymousId,
+          deviceInfo: share ? await _deviceInfoCollector.collect() : AnalyticsDeviceInfo(platform: _platformName),
           events: batch.map((q) => q.event).toList(growable: false),
           userId: _userId,
-          userProperties: Map<String, String>.of(_userProperties),
+          userProperties: share ? Map<String, String>.of(_userProperties) : const <String, String>{},
         );
 
         switch (result.status) {
